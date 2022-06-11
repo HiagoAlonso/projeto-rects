@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Primeiro Jogo Multiplayer</title>
+
+    <style>
+        #screen{
+            border: 10px solid #CCC;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            image-rendering: -moz-crisp-edges;
+            width: 400px;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="screen" width="10" height="10"></canvas>
+    <script>
+
+        //       D A D O S  E  R E G R A S
+
+        const screen = document.getElementById('screen')
+        const context = screen.getContext('2d')
+        const currentPlayerId = 'player1'
+
+        function createGame() {
+
+            const state = {
+                players: {},
+                fruits: {}
+            }
+
+            // Players
+
+            function addPlayer(command){ //Método "Addplayer" que recebe um "Comando" com os dados de ID e posição.
+                const playerId = command.playerId
+                const playerX = command.playerX
+                const playerY = command.playerY
+
+                state.players[playerId] = { //E adiciona na Lista de "Players", um novo 'PlayerID' com sua respectiva posição na tela.
+                    x: playerX,
+                    y: playerY
+                }
+            }
+            function removePlayer(command){ //Simplesmente deleta o "PlayerID" da lista de "Players".
+                const playerId = command.playerId
+                delete state.players[playerId]
+            }
+
+            //Frutas
+
+            function addFruit(command){ //Método "Addfruit" que recebe um "Comando" com os dados de ID e posição.
+                const fruitId = command.fruitId
+                const fruitX = command.fruitX
+                const fruitY = command.fruitY
+
+                state.fruits[fruitId] = { //E adiciona na Lista de "Fruits", um novo 'FruitID' com sua respectiva posição na tela.
+                    x: fruitX,
+                    y: fruitY
+                }
+            }
+            function removeFruit(command){ //Simplesmente deleta o "FruitId" da lista de "Fruits".
+                const fruitId = command.fruitId
+                delete state.fruits[fruitId]
+            }
+
+
+
+            function movePlayer(command) {
+                const acceptedMoves = {
+                    ArrowUp(player) { // Retorna o maior valor entre a posição (Y - 1), logo limita-se á positivos ou nulos.
+                        player.y = Math.max(player.y - 1, 0);
+                    },
+                    ArrowRight(player) { // Retorna o menor valor entre a posição (X + 1) e a largura total da tela, logo limita-se à valores abaixo ou iguais á ela.
+                        player.x = Math.min(player.x + 1, screen.width - 1);
+                    },
+                    ArrowDown(player) { // Retorna o menor valor entre a posição (Y + 1) e a altura total da tela, logo limita-se à valores abaixo ou iguais á ela.
+                        player.y = Math.min(player.y + 1, screen.height - 1);
+                    },
+                    ArrowLeft(player) { // Retorna o maior valor entre a posição (X - 1), logo limita-se á positivos ou nulos.
+                        player.x = Math.max(player.x - 1, 0);
+                    }
+                }
+
+                const keyPressed = command.keyPressed
+                const playerId = command.playerId
+                const player = state.players[command.playerId]
+                const moveFunction = acceptedMoves[keyPressed]
+
+                if (player && moveFunction){
+                    moveFunction(player)
+                    checkForFruitsCollision(playerId) //A cada movimento o sistema checará para ver se este determinado player relatou uma colisão com uma fruta.
+                }
+            }
+
+            function checkForFruitsCollision(playerId) {
+                const player = state.players[playerId] //Define o "player" analisado como o Jogador Principal, aquele que está se movendo. 
+
+                for (const fruitId in state.fruits) { //Para cada "Fruta" no cesto de "Frutas" é feito uma verificação de colisão com o jogador.
+                    const fruit = state.fruits[fruitId]
+                    console.log(`Checking for ${playerId} and ${fruitId}`)
+
+                    if (player.x === fruit.x && player.y == fruit.y) {
+                        console.log(`COLLISION! between ${playerId} and ${fruitId}`) //Caso a Colisão seja detectada, a fruta é removida.
+                        game.removeFruit({fruitId})
+                    }
+                }
+            }
+
+            return {
+                movePlayer,
+                addPlayer,
+                removePlayer,
+                addFruit,
+                removeFruit,
+                state
+            }
+        }
+        const game = createGame()
+        game.addPlayer({playerId: 'player1', playerX: 0, playerY: 0})
+        game.addFruit({fruitId: 'fruit1', fruitX: 5, fruitY: 5})
+
+        //       I N P U T S
+
+        const KeyboardListener = createKeyboardListener()
+        KeyboardListener.subscribe(game.movePlayer)
+
+        function createKeyboardListener(){ 
+
+            const state = {
+                observers: []
+            }
+
+            function subscribe(observerFunction){
+                state.observers.push(observerFunction)
+            }
+
+            function notifyAll(command){
+                for (const observerFunction of state.observers){
+                    observerFunction(command)
+                }
+            }
+
+            document.addEventListener('keydown', handleKeydown)
+
+            function handleKeydown(event) {
+                const keyPressed = event.key
+
+                const command = {
+                    playerId: 'player1',
+                    keyPressed
+                }
+
+                notifyAll(command)
+            }
+
+            return {
+                subscribe
+            }
+        }
+
+        //       R E N D E R I Z A Ç Ã O
+
+        renderScreen()
+
+        function renderScreen() {
+            context.fillStyle = 'white'
+            context.clearRect(0, 0, 10, 10)
+
+            for (const playerId in game.state.players){
+                const player = game.state.players[playerId]
+                context.fillStyle = 'black'
+                context.fillRect(player.x, player.y, 1, 1)
+            }
+            for (const fruitId in game.state.fruits){
+                const fruit = game.state.fruits[fruitId]
+                context.fillStyle = 'green'
+                context.fillRect(fruit.x, fruit.y, 1, 1)
+            }
+
+            requestAnimationFrame(renderScreen)
+        }
+
+    </script>
+</body>
+</html>
